@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Python 100 챌린지 - 코딩마스터스 4인 그룹 스튜디오</title>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- CodeMirror for Python Code Editor -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/merge/merge.min.css">
+  
+  <!-- Diff_match_patch for Side-by-Side Code Diff -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/merge/merge.min.js"></script>
+  
+  <!-- Pyodide: In-Browser Python 3 Engine (WebAssembly) -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+  <!-- Top Global Header -->
+  <header class="app-header">
+    <div class="logo-area">
+      <div class="brand-icon"><i class="fa-brands fa-python"></i></div>
+      <div class="brand-text">
+        <h1>Coding Masters 100 <span class="badge-team">4인 고정 스터디</span></h1>
+        <p class="subtitle">실시간 브라우저 실행 • 4인 풀이 자동 클라우드 동기화 • 상호 Diff 비교</p>
+      </div>
+    </div>
+
+    <!-- Global Actions & Cloud Sync Status -->
+    <div class="header-actions">
+      <!-- Cloud Sync Room Status -->
+      <div class="sync-status" id="sync-status-box" title="클라우드 실시간 동기화 상태 (어디서 열든 자동 동기화)">
+        <span class="status-dot ready" id="sync-dot"></span>
+        <span class="sync-text" id="sync-text">동기화 대기중...</span>
+        <button id="btn-sync-now" class="btn-icon-xs" title="지금 즉시 동기화"><i class="fa-solid fa-arrows-rotate"></i></button>
+      </div>
+
+      <div class="pyodide-status" id="pyodide-status" title="브라우저 내장 Python 엔진 준비 상태">
+        <span class="status-dot loading"></span>
+        <span class="status-text">Python 준비 중...</span>
+      </div>
+
+      <!-- Room & Member Settings -->
+      <button id="btn-room-settings" class="btn btn-secondary" title="동기화 룸 키 설정 및 4명 팀원 이름 변경">
+        <i class="fa-solid fa-users-gear"></i> 룸/팀원 설정
+      </button>
+
+      <button id="btn-export-data" class="btn btn-secondary" title="풀이 JSON 백업 다운로드">
+        <i class="fa-solid fa-file-export"></i> 백업
+      </button>
+      <button id="btn-import-data" class="btn btn-secondary" title="풀이 JSON 파일 가져오기">
+        <i class="fa-solid fa-file-import"></i> 불러오기
+      </button>
+      <input type="file" id="file-import-input" accept=".json" style="display: none;">
+      
+      <button id="btn-toggle-diff-mode" class="btn btn-accent">
+        <i class="fa-solid fa-code-compare"></i> <span id="diff-mode-text">코드 비교 모드</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main 3-Column Layout -->
+  <div class="main-container">
+    
+    <!-- LEFT: Question Navigator (1 to 100) -->
+    <aside class="sidebar-questions">
+      <div class="sidebar-header">
+        <div class="search-box">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input type="text" id="question-search" placeholder="문제 번호, 제목, 키워드 검색...">
+        </div>
+        <div class="filter-row">
+          <select id="filter-difficulty" class="dropdown">
+            <option value="all">모든 난이도</option>
+            <option value="기초">기초</option>
+            <option value="초급">초급</option>
+            <option value="중급">중급</option>
+            <option value="고급">고급</option>
+          </select>
+          <select id="filter-category" class="dropdown">
+            <option value="all">모든 분류</option>
+          </select>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-labels">
+            <span>나의 완료율: <strong id="progress-percent">0%</strong></span>
+            <span id="progress-count">0 / 100 완료</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Question List Items -->
+      <div class="question-list" id="question-list">
+        <!-- Rendered dynamically via JS -->
+      </div>
+    </aside>
+
+    <!-- CENTER & RIGHT: Workspace -->
+    <main class="workspace">
+      
+      <!-- TOP: Question Details Card -->
+      <section class="question-card">
+        <div class="question-card-header">
+          <div class="header-left">
+            <span class="q-badge q-num" id="current-q-num">Q. 01</span>
+            <h2 id="current-q-title">10배</h2>
+            <span class="q-badge q-diff" id="current-q-diff">기초</span>
+            <span class="q-badge q-cat" id="current-q-cat">기초 문법</span>
+          </div>
+          <div class="header-right">
+            <button id="btn-reset-template" class="btn-icon" title="기본 코드 템플릿으로 되돌리기">
+              <i class="fa-solid fa-rotate-left"></i> 초기화
+            </button>
+          </div>
+        </div>
+        <div class="question-desc" id="current-q-desc">
+          <!-- Problem Description -->
+        </div>
+      </section>
+
+      <!-- VIEW 1: Standard Editor & Execution View -->
+      <section class="editor-workspace" id="standard-view">
+        <div class="editor-header">
+          <!-- 4 Fixed Member Selection Tabs -->
+          <div class="member-tabs" id="member-tabs">
+            <!-- Fixed 4 Member Tabs Rendered via JS -->
+          </div>
+          
+          <div class="editor-tools">
+            <span class="autosave-tag" id="autosave-status"><i class="fa-solid fa-cloud-check"></i> 저장됨</span>
+            <button id="btn-run-code" class="btn btn-primary" title="Python 코드 실행 (Ctrl + Enter)">
+              <i class="fa-solid fa-play"></i> 코드 실행 (Run)
+            </button>
+          </div>
+        </div>
+
+        <!-- Split Grid: Editor (Left/Top) & Output Console (Right/Bottom) -->
+        <div class="editor-grid">
+          <div class="code-editor-wrapper">
+            <textarea id="code-editor"></textarea>
+          </div>
+
+          <div class="terminal-panel">
+            <div class="terminal-header">
+              <span class="term-title"><i class="fa-solid fa-terminal"></i> 실행 콘솔 (Output)</span>
+              <div class="term-actions">
+                <span id="run-time-badge" class="time-badge" style="display: none;">실행 시간: 0ms</span>
+                <button id="btn-clear-term" class="btn-icon-xs" title="콘솔 지우기"><i class="fa-solid fa-trash-can"></i></button>
+              </div>
+            </div>
+            
+            <div class="terminal-body" id="terminal-output">
+              <div class="terminal-placeholder">
+                <i class="fa-solid fa-circle-info"></i> 상단의 [코드 실행] 버튼을 누르거나 <code>Ctrl + Enter</code>를 누르면 브라우저 내장 Python 엔진이 코드를 실행합니다.
+              </div>
+            </div>
+
+            <!-- Test Cases Panel -->
+            <div class="testcases-panel">
+              <div class="testcases-header">
+                <span><i class="fa-solid fa-vial-circle-check"></i> 예제 테스트 케이스</span>
+                <button id="btn-run-tests" class="btn-sm btn-secondary">테스트 실행</button>
+              </div>
+              <div class="testcases-list" id="testcases-list">
+                <!-- Dynamic Test Cases -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: Side-by-Side Diff Comparison View -->
+      <section class="diff-workspace" id="diff-view" style="display: none;">
+        <div class="diff-header-bar">
+          <div class="diff-selector">
+            <label><i class="fa-solid fa-user"></i> 비교 팀원 1 (좌측):</label>
+            <select id="diff-member-left" class="dropdown diff-select"></select>
+          </div>
+          <div class="diff-vs-badge">VS</div>
+          <div class="diff-selector">
+            <label><i class="fa-solid fa-user"></i> 비교 팀원 2 (우측):</label>
+            <select id="diff-member-right" class="dropdown diff-select"></select>
+          </div>
+          <button id="btn-copy-diff" class="btn btn-sm btn-secondary" title="우측 코드를 좌측으로 가져오기">
+            <i class="fa-solid fa-arrow-left"></i> 우측 코드 적용
+          </button>
+        </div>
+
+        <div class="diff-editor-container" id="diff-editor-container">
+          <!-- CodeMirror MergeView will mount here -->
+        </div>
+
+        <div class="diff-footer-info">
+          <div class="diff-legend">
+            <span class="legend-box add"></span> 추가된 코드
+            <span class="legend-box del"></span> 변경/삭제된 코드
+          </div>
+          <div class="diff-hint">
+            💡 4명의 풀이를 1:1로 교차 비교하며 가장 직관적이거나 빠른 코드를 분석할 수 있습니다.
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Modal: Room & 4 Members Settings -->
+  <div id="settings-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-users-gear"></i> 스터디 룸 & 4인 팀원 설정</h3>
+        <button id="btn-close-modal" class="btn-icon-xs"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>🌐 클라우드 동기화 룸 코드 (Room ID):</label>
+          <input type="text" id="input-room-id" class="text-input" placeholder="예: codingmasters-team4">
+          <small class="form-hint">어느 컴퓨터에서든 이 룸 코드만 똑같이 입력하면 4명의 풀이가 실시간으로 동기화됩니다.</small>
+        </div>
+
+        <div class="form-divider"></div>
+
+        <label style="font-weight: 600; font-size: 0.85rem; margin-bottom: 8px; display: block;">👥 고정 4인 팀원 이름 설정:</label>
+        <div class="members-input-grid">
+          <div class="form-group">
+            <label>팀원 1 (나):</label>
+            <input type="text" id="input-member-1" class="text-input" value="팀원 1 (나)">
+          </div>
+          <div class="form-group">
+            <label>팀원 2:</label>
+            <input type="text" id="input-member-2" class="text-input" value="팀원 2 (민수)">
+          </div>
+          <div class="form-group">
+            <label>팀원 3:</label>
+            <input type="text" id="input-member-3" class="text-input" value="팀원 3 (지은)">
+          </div>
+          <div class="form-group">
+            <label>팀원 4:</label>
+            <input type="text" id="input-member-4" class="text-input" value="팀원 4 (도윤)">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="btn btn-primary"><i class="fa-solid fa-check"></i> 설정 저장 및 동기화</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Modal -->
+  <div id="toast" class="toast">알림 메시지</div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
